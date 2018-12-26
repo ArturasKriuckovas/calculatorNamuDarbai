@@ -8,11 +8,14 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Stack;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+    public static String[] allSymbols = {"+", "-", "/", "*","(", ")"};
+    public static String[] operators = {"+", "-", "/", "*"};
     TextView resultDisplay;
     String[] symbols = {"/", "-", "+", "*"};
     String[] numbers = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "."};
@@ -110,16 +113,126 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 resultDisplay.setText("");
                 break;
             case R.id.equals:
-                resultDisplay.setText(equals(oldValue));
+                resultDisplay.setText(evaluatePostFix(convertToPostfix(getListOfValues(oldValue))));
                 break;
             default:
                 break;
         }
     }
 
+    public static ArrayList<String> getListOfValues(String expression){
+        ArrayList<String> list = new ArrayList<>();
+        String tempValue = "";
+        for (int i = 0; i < expression.length(); i++){
+            String item = Character.toString(expression.charAt(i));
+            if(checkIfContains(item, allSymbols)){
+                list.add(item);
+            } else {
+                tempValue += item;
+                if(checkIfContains(Character.toString(expression.charAt(i+1)), allSymbols)){
+                    list.add(tempValue);
+                    tempValue = "";
+                }
+            }
+        }
+        return list;
+    }
+
+    public static String evaluatePostFix(ArrayList<String> value){
+        Stack<String> mStack = new Stack<>();
+        for (int i = 0; i < value.size(); i++){
+            if(checkIfContains(value.get(i), operators)){
+                String right = mStack.pop();
+                String left = mStack.pop();
+                mStack.push(evaluate(left, right, value.get(i)));
+            } else {
+                mStack.push(value.get(i));
+            }
+        }
+        return mStack.pop();
+    }
+
+    public static String evaluate(String a, String b, String operator){
+        BigDecimal left = new BigDecimal(a);
+        BigDecimal right = new BigDecimal(b);
+        BigDecimal result = new BigDecimal(0);
+        switch (operator) {
+            case "+":
+                result = left.add(right);
+                break;
+            case "-":
+                result = left.subtract(right);
+                break;
+            case "*":
+                result = left.multiply(right);
+                break;
+            case "/":
+                result = left.divide(right);
+                break;
+            default: break;
+        }
+        return String.valueOf(result);
+    }
+
+    static boolean checkIfContains(String c, String[] array) {
+        for (String x : array) {
+            if (x.equals(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    static int getLevelOfOperator(String operator){
+        int value = 0;
+        if (operator.equals("+") || operator.equals("-")){
+            value = 1;
+        } else if (operator.equals("*") || operator.equals("/")){
+            value = 2;
+        }
+        return value;
+
+    }
+
+    static ArrayList<String> convertToPostfix(ArrayList<String> infix){
+        Stack<String> mStack = new Stack<>();
+        ArrayList<String> list = new ArrayList<>();
+        String postFix = "";
+        for (int i = 0; i < infix.size(); i++){
+            String item = infix.get(i);
+
+            boolean isOperator = checkIfContains(item, operators);
+            if(!isOperator && !item.equals("(") && !item.equals(")")){
+                list.add(item);
+            } else if (item.equals("(")){
+                mStack.push(item);
+            } else if (item.equals(")")){
+                while(!mStack.isEmpty() && !mStack.peek().equals("(")){
+                    list.add(mStack.pop());
+                }
+                mStack.pop();
+            } else if (isOperator){
+                if (mStack.empty() || mStack.peek().equals("(")){
+                    mStack.push(item);
+                } else {
+                    while(!mStack.isEmpty() && !mStack.peek().equals("(")
+                            && getLevelOfOperator(item) <= getLevelOfOperator(mStack.peek())) {
+                        list.add(mStack.pop());
+                    }
+                    mStack.push(item);
+                }
+            }
+        }
+        while (!mStack.isEmpty()){
+            list.add(mStack.pop());
+        }
+        return list;
+
+    }
+
     String validateInput (String oldValue,String newEntry){
+        // TODO need to update validation
         String result = oldValue;
-        String[] separatedValues = resultDisplay.getText().toString().split(Arrays.toString(symbols));
+        String[] separatedValues = resultDisplay.getText().toString().split(Arrays.toString(operators));
         String lastValue = separatedValues.length > 0 ? separatedValues[separatedValues.length - 1] : "";
         String lastSymbol = lastValue.length() == 0 ? "" : result.substring(result.length() - 1);
         Boolean lastCharIsOperator = false;
@@ -146,136 +259,4 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         return result;
     }
 
-    String equals(String item){
-        ArrayList<String> listWithoutBrackets = new ArrayList<>();
-        String[] mathExpressions = item.split("[\\(||\\)]");
-        for(String value: mathExpressions){
-            if(!value.equals("") && value.length() > 0){
-                String[] listOfValueChar = value.split("");
-                String first = listOfValueChar[1];
-                String last = listOfValueChar[listOfValueChar.length - 1];
-                if(numbersArrayList.contains(first) && numbersArrayList.contains(last)){
-                    listWithoutBrackets.add(value);
-                } else {
-                    listWithoutBrackets.addAll(Arrays.asList(value.split("")));
-                }
-            }
-            listWithoutBrackets.removeAll(Arrays.asList(""));
-        }
-        String expression = TextUtils.join("", getRidOfSqrt(calculateInsideBrackets(listWithoutBrackets)));
-        return evaluate(expression);
-    }
-
-    ArrayList<String> getRidOfSqrt(ArrayList<String> items){
-        ArrayList<String> result = new ArrayList<>();
-        for(Integer i = 0; i < items.size(); i++){
-            if(items.get(i).equals("√")){
-                Double item = Double.parseDouble(items.get(i+1));
-                result.add(String.valueOf(Math.sqrt(item)));
-                i++;
-            } else {
-                result.add(items.get(i));
-            }
-        }
-        result.removeAll(Arrays.asList(""));
-        return result;
-    }
-
-    ArrayList<String> calculateInsideBrackets(ArrayList<String> items){
-        ArrayList<String> list = new ArrayList<>();
-        for (String s: items){
-            Boolean contains = false;
-            for(String item : symbolsArrayList){
-               if(s.contains(item)){
-                   contains = s.contains(item);
-                   break;
-               }
-            }
-            if(s.length() > 1 && contains && !s.contains("√")){
-                list.add(evaluate(s));
-            } else {
-                list.addAll(Arrays.asList(s.split("")));
-            }
-        }
-        list.removeAll(Arrays.asList(""));
-        return list;
-    }
-
-    String evaluate(String s){
-        // not mine: https://www.sanfoundry.com/java-program-implement-evaluate-expression-using-stacks/
-        Stack<Integer> op  = new Stack<Integer>();
-        Stack<Double> val = new Stack<Double>();
-        Stack<Integer> optmp  = new Stack<Integer>();
-        Stack<Double> valtmp = new Stack<Double>();
-        String input = s;
-        input = input.replaceAll("-","+-");
-        /* Store operands and operators in respective stacks */
-        String temp = "";
-        for (int i = 0;i < input.length();i++)
-        {
-            char ch = input.charAt(i);
-            if (ch == '-')
-                temp = "-" + temp;
-            else if (ch != '+' &&  ch != '*' && ch != '/')
-                temp = temp + ch;
-            else
-            {
-                val.push(Double.parseDouble(temp));
-                op.push((int)ch);
-                temp = "";
-            }
-        }
-        val.push(Double.parseDouble(temp));
-        /* Create char array of operators as per precedence */
-        /* -ve sign is already taken care of while storing */
-        char operators[] = {'/','*','+'};
-        /* Evaluation of expression */
-        for (int i = 0; i < 3; i++)
-        {
-            boolean it = false;
-            while (!op.isEmpty())
-            {
-                int optr = op.pop();
-                double v1 = val.pop();
-                double v2 = val.pop();
-                if (optr == operators[i])
-                {
-                    /* if operator matches evaluate and store in temporary stack */
-                    if (i == 0)
-                    {
-                        valtmp.push(v2 / v1);
-                        it = true;
-                        break;
-                    }
-                    else if (i == 1)
-                    {
-                        valtmp.push(v2 * v1);
-                        it = true;
-                        break;
-                    }
-                    else if (i == 2)
-                    {
-                        valtmp.push(v2 + v1);
-                        it = true;
-                        break;
-                    }
-
-                }
-                else
-                {
-                    valtmp.push(v1);
-                    val.push(v2);
-                    optmp.push(optr);
-                }
-            }
-            /* Push back all elements from temporary stacks to main stacks */
-            while (!valtmp.isEmpty())
-                val.push(valtmp.pop());
-            while (!optmp.isEmpty())
-                op.push(optmp.pop());
-            if (it)
-                i--;
-        }
-        return val.pop().toString();
-    }
 }
